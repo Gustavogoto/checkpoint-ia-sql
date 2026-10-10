@@ -15,7 +15,7 @@ Resultado: tabela com os 3 produtos e as unidades vendidas
 
 ## A LLM escolhida: Qwen3-0.6B
 - **Está na lista** de modelos sugeridos pelo professor.
-- **Tamanho:** tem 0,6 bilhão de parâmetros. O treino de todos os pesos cabe na GPU T4 gratuita do Google Colab.
+- **Tamanho:** tem 0,6 bilhão de parâmetros. Com LoRA, o treino cabe com folga na GPU T4 gratuita do Google Colab. Treinar todos os pesos estourou a memória da T4 (15 GB), por isso usamos LoRA.
 - **Conhecimento prévio:** já viu bastante código, inclusive SQL, então aprende rápido o padrão do nosso banco.
 
 ## Como foi feito
@@ -28,9 +28,9 @@ Tudo está em **um único notebook**, [`checkpoint_ia_texto_sql.ipynb`](checkpoi
 | 4 | Cria o banco SQLite da loja e executa as consultas em modo somente leitura |
 | 5 | Monta o dataset de treino, validação, teste e teste manual |
 | 6–7 | Avalia o modelo base, **antes** do treino |
-| 8 | Fine-tuning na GPU (forward → loss → backward → step), com validação a cada época |
+| 8 | Fine-tuning com **LoRA** na GPU (forward → loss → backward → step), com validação a cada época |
 | 9 | Avalia **depois** do treino e compara |
-| 10 | Testa parâmetros de geração (temperature, top_p) e de treino (taxa de aprendizado, épocas) |
+| 10 | Testa parâmetros de geração (temperature, top_p) e de treino (taxa de aprendizado, épocas, rank do LoRA) |
 | 11 | Mostra onde o modelo erra |
 | 13 | Frontend web (Gradio) para o usuário fazer perguntas |
 
@@ -67,4 +67,5 @@ Tudo está em **um único notebook**, [`checkpoint_ia_texto_sql.ipynb`](checkpoi
 - Qwen Team. *Qwen3 Technical Report*. 2025.
 - Allal, L. B. et al. *SmolLM2: When Smol Goes Big*. 2025 (base da Aula 8).
 - Yu, T. et al. *Spider: A Large-Scale Human-Labeled Dataset for Text-to-SQL*. 2018.
-- Hugging Face Transformers: documentação oficial.
+- Hu, E. et al. *LoRA: Low-Rank Adaptation of Large Language Models*. 2021.
+- Hugging Face Transformers e PEFT: documentação oficial.
