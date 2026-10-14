@@ -53,7 +53,7 @@ Tudo está em **um único notebook**, [`checkpoint_ia_texto_sql.ipynb`](checkpoi
 | Qwen3-0.6B + LoRA (depois) | **96,0% (72/75)** | **76,7% (23/30)** |
 | **Ganho** | **+76 pontos** | **+63 pontos** |
 
-![Antes x depois](Antes x depois.png)
+![Antes x depois](Antesxdepois.png)
 
 ### Análise
 - **O fine-tuning funcionou.** No teste, o modelo passou de 1 acerto em cada 5 perguntas para 72 de 75. Treinamos só cerca de 1% dos parâmetros (LoRA), em poucos minutos, numa GPU gratuita.
