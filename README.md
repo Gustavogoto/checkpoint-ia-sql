@@ -1,6 +1,6 @@
 # Checkpoint de IA: Assistente Texto → SQL com Qwen3-0.6B
 
-**Grupo:** Nome 1 (RM) · Nome 2 (RM) · Nome 3 (RM) · Nome 4 (RM) · Nome 5 (RM)
+**Grupo:** Breno Silva(rm99275) · Eduardo Araujo(rm99758) · Gabriela Trevisan(rm99500) · Gustavo Akio(rm550241) · Rafael Franck(rm550875)
 
 ## O problema
 Quem não sabe SQL não consegue tirar informações de um banco de dados sozinho. Treinamos uma LLM pequena para **transformar perguntas em português em consultas SQL** sobre o banco fixo de uma loja online. A consulta é **executada** e o resultado volta para o usuário. O tema é o "Texto → SQL em um schema fixo", da lista de sugestões.
@@ -45,14 +45,29 @@ Tudo está em **um único notebook**, [`checkpoint_ia_texto_sql.ipynb`](checkpoi
 **Avaliação:** o SQL gerado é **executado** e o resultado é comparado com o da consulta correta. Uma consulta escrita de outro jeito, mas que devolve o mesmo resultado, conta como acerto. Também medimos a % de SQL válido e o tempo por pergunta.
 
 ## Resultados
-> Cole aqui a tabela que a Etapa 10.3 imprime.
 
-| Experimento | Acurácia no teste | Acurácia no teste manual | SQL válido |
-|---|---|---|---|
-| Modelo base (antes) | | | |
-| Modelo treinado (depois) | | | |
+### Antes x depois do fine-tuning
+| Modelo | Teste (75 perguntas) | Teste manual (30 perguntas) |
+|---|---|---|
+| Qwen3-0.6B base (antes) | 20,0% (15/75) | 13,3% (4/30) |
+| Qwen3-0.6B + LoRA (depois) | **96,0% (72/75)** | **76,7% (23/30)** |
+| **Ganho** | **+76 pontos** | **+63 pontos** |
 
 ![Antes x depois](prints/antes_depois.png)
+
+### Análise
+- **O fine-tuning funcionou.** No teste, o modelo passou de 1 acerto em cada 5 perguntas para 72 de 75. Treinamos só cerca de 1% dos parâmetros (LoRA), em poucos minutos, numa GPU gratuita.
+- **O modelo aprendeu a regra de negócio.** A regra "faturamento não conta pedidos cancelados" não está no prompt. O modelo base não tinha como saber dela. O modelo treinado passou a gerar `WHERE pe.status <> 'cancelado'` sozinho, como mostra o print do frontend.
+- **Generalização:** o teste usa uma forma de perguntar que o modelo nunca viu no treino, e mesmo assim ele acertou 96%. O teste manual tem perguntas escritas de jeitos bem diferentes ("Existe algum produto encalhado?", "Qual UF trouxe mais dinheiro?") e ficou em 77%. A diferença entre os dois mostra o limite do treino com templates: quanto mais a pergunta foge do padrão, mais o modelo erra.
+- **Curva de loss:** a loss cai de cerca de 1,4 para perto de 0 nos primeiros ~150 passos e fica estável até o fim, cerca de 870 passos em 3 épocas. O modelo aprendeu rápido o padrão dos exemplos de treino. Como a loss praticamente zera, as épocas finais trazem pouco ganho, e o modelo fica muito ajustado aos templates do treino (*overfitting* leve). Isso ajuda a explicar a diferença entre o teste (96%) e o teste manual (77%). Por isso, a cada época o notebook avalia na validação e guarda o melhor checkpoint.
+- **Onde ainda erra:** a Etapa 11 do notebook lista os erros. <!-- TROCAR: descrevam aqui 2 ou 3 erros reais que aparecem na Etapa 11 -->
+
+### Testes de parâmetros
+> Cole aqui a tabela que a Etapa 10.3 imprime (temperature, top_p, taxa de aprendizado, épocas e rank do LoRA).
+
+### Limitações e próximos passos
+- O banco e as perguntas são de um único domínio (loja online), e o treino usa 26 tipos de pergunta.
+- Para melhorar o teste manual: escrever mais variações de perguntas para o treino, usar um modelo maior da lista (Qwen3-1.7B) ou usar um dataset público como o Spider.
 
 ## GPU e frontend
 ![GPU](prints/gpu.png)
