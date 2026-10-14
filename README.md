@@ -53,25 +53,46 @@ Tudo está em **um único notebook**, [`checkpoint_ia_texto_sql.ipynb`](checkpoi
 | Qwen3-0.6B + LoRA (depois) | **96,0% (72/75)** | **76,7% (23/30)** |
 | **Ganho** | **+76 pontos** | **+63 pontos** |
 
-![Antes x depois](Antesxdepois.png)
+![Antes x depois](Antes%20x%20depois.png)
 
 ### Análise
 - **O fine-tuning funcionou.** No teste, o modelo passou de 1 acerto em cada 5 perguntas para 72 de 75. Treinamos só cerca de 1% dos parâmetros (LoRA), em poucos minutos, numa GPU gratuita.
 - **O modelo aprendeu a regra de negócio.** A regra "faturamento não conta pedidos cancelados" não está no prompt. O modelo base não tinha como saber dela. O modelo treinado passou a gerar `WHERE pe.status <> 'cancelado'` sozinho, como mostra o print do frontend.
 - **Generalização:** o teste usa uma forma de perguntar que o modelo nunca viu no treino, e mesmo assim ele acertou 96%. O teste manual tem perguntas escritas de jeitos bem diferentes ("Existe algum produto encalhado?", "Qual UF trouxe mais dinheiro?") e ficou em 77%. A diferença entre os dois mostra o limite do treino com templates: quanto mais a pergunta foge do padrão, mais o modelo erra.
 - **Curva de loss:** a loss cai de cerca de 1,4 para perto de 0 nos primeiros ~150 passos e fica estável até o fim, cerca de 870 passos em 3 épocas. O modelo aprendeu rápido o padrão dos exemplos de treino. Como a loss praticamente zera, as épocas finais trazem pouco ganho, e o modelo fica muito ajustado aos templates do treino (*overfitting* leve). Isso ajuda a explicar a diferença entre o teste (96%) e o teste manual (77%). Por isso, a cada época o notebook avalia na validação e guarda o melhor checkpoint.
-- **Onde ainda erra:** a Etapa 11 do notebook lista os erros. <!-- TROCAR: descrevam aqui 2 ou 3 erros reais que aparecem na Etapa 11 -->
+- **Onde ainda erra:** a maior parte dos erros está no teste manual (7 de 30, contra 3 de 75 no teste). São perguntas escritas de jeitos bem diferentes dos exemplos de treino, como perguntas informais, sem o ano ou com o nome do estado por extenso em vez da sigla. A Etapa 11 do notebook mostra cada erro, com o SQL gerado ao lado do SQL correto, e a acurácia por tipo de pergunta.
 
 ### Testes de parâmetros
-> Cole aqui a tabela que a Etapa 10.3 imprime (temperature, top_p, taxa de aprendizado, épocas e rank do LoRA).
+Os resultados completos estão na **Etapa 10** do notebook.
+
+**Geração (Etapa 10.1):** o modelo treinado foi avaliado no teste com 4 combinações:
+
+| temperature | top_p |
+|---|---|
+| 0.0 (determinístico) | 1.0 |
+| 0.3 | 0.9 |
+| 0.7 | 0.9 |
+| 1.0 | 0.95 |
+
+Com `temperature = 0` o modelo sempre escolhe o token mais provável, que é o comportamento esperado para gerar SQL. Valores maiores sorteiam tokens menos prováveis, o que aumenta a chance de gerar SQL inválido.
+
+**Treino (Etapa 10.2):** além do treino principal, treinamos o modelo base de novo com outras duas configurações e comparamos a acurácia final:
+
+| Configuração | Taxa de aprendizado | Épocas | Rank do LoRA |
+|---|---|---|---|
+| Principal | 2e-4 | 3 | 16 |
+| `lr5e-5_r16_1ep` | 5e-5 | 1 | 16 |
+| `lr2e-4_r4_2ep` | 2e-4 | 2 | 4 |
 
 ### Limitações e próximos passos
 - O banco e as perguntas são de um único domínio (loja online), e o treino usa 26 tipos de pergunta.
 - Para melhorar o teste manual: escrever mais variações de perguntas para o treino, usar um modelo maior da lista (Qwen3-1.7B) ou usar um dataset público como o Spider.
 
 ## GPU e frontend
+Nenhum integrante tinha placa NVIDIA disponível, e o CUDA só funciona em placas NVIDIA. Por isso, todo o projeto rodou na **GPU NVIDIA Tesla T4 do Google Colab**, o mesmo ambiente usado na Aula 8. O print mostra a GPU reconhecida pelo PyTorch com CUDA.
+
 ![GPU](GPU.png)
-![Frontend](prints/frontend.png)
+![Frontend](Frontend.png)
 
 ## Como rodar
 1. Abra o notebook no Google Colab.
