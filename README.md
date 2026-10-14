@@ -56,33 +56,46 @@ Tudo está em **um único notebook**, [`checkpoint_ia_texto_sql.ipynb`](checkpoi
 ![Antes x depois](Antesxdepois.png)
 
 ### Análise
-- **O fine-tuning funcionou.** No teste, o modelo passou de 1 acerto em cada 5 perguntas para 72 de 75. Treinamos só cerca de 1% dos parâmetros (LoRA), em poucos minutos, numa GPU gratuita.
+- **O fine-tuning funcionou.** No teste, o modelo passou de 1 acerto em cada 5 perguntas para 72 de 75. Treinamos menos de 2% dos parâmetros (LoRA), em cerca de 9 minutos, numa GPU gratuita.
 - **O modelo aprendeu a regra de negócio.** A regra "faturamento não conta pedidos cancelados" não está no prompt. O modelo base não tinha como saber dela. O modelo treinado passou a gerar `WHERE pe.status <> 'cancelado'` sozinho, como mostra o print do frontend.
 - **Generalização:** o teste usa uma forma de perguntar que o modelo nunca viu no treino, e mesmo assim ele acertou 96%. O teste manual tem perguntas escritas de jeitos bem diferentes ("Existe algum produto encalhado?", "Qual UF trouxe mais dinheiro?") e ficou em 77%. A diferença entre os dois mostra o limite do treino com templates: quanto mais a pergunta foge do padrão, mais o modelo erra.
 - **Curva de loss:** a loss cai de cerca de 1,4 para perto de 0 nos primeiros ~150 passos e fica estável até o fim, cerca de 870 passos em 3 épocas. O modelo aprendeu rápido o padrão dos exemplos de treino. Como a loss praticamente zera, as épocas finais trazem pouco ganho, e o modelo fica muito ajustado aos templates do treino (*overfitting* leve). Isso ajuda a explicar a diferença entre o teste (96%) e o teste manual (77%). Por isso, a cada época o notebook avalia na validação e guarda o melhor checkpoint.
-- **Onde ainda erra:** a maior parte dos erros está no teste manual (7 de 30, contra 3 de 75 no teste). São perguntas escritas de jeitos bem diferentes dos exemplos de treino, como perguntas informais, sem o ano ou com o nome do estado por extenso em vez da sigla. A Etapa 11 do notebook mostra cada erro, com o SQL gerado ao lado do SQL correto, e a acurácia por tipo de pergunta.
+- **Erros do modelo base (antes):** ele não conhecia o banco e inventava. Usava colunas que não existem (`produtos.quantidade`), comparava `categoria_id = 'Livros'` sem fazer o JOIN com `categorias`, devolvia `SELECT *` em vez das colunas pedidas e escrevia `'Entregue'` e `'Pernambuco'` em vez de `'entregue'` e `'PE'`.
+- **Onde o modelo treinado ainda erra:** os 7 erros do teste manual acontecem quando a pergunta foge do padrão do treino:
+  - *"Lista de clientes de **Pernambuco**"*: gerou `estado = 'Pernambuco'`. O banco guarda a sigla `'PE'`, e no treino só apareciam siglas.
+  - *"quais produtos de **informática**?"*: copiou a palavra em minúsculas e não encontrou a categoria `'Informática'`.
+  - *"Quantos pedidos tivemos em março?"*: sem o ano na pergunta, o modelo "chutou" 2023 em vez de 2025.
+  - *"Quantos pedidos foram **entregues**?"* e *"ainda estão **pendentes**?"*: no treino, o status sempre vinha como "com status X". Escrito como adjetivo, o modelo não reconheceu.
+  - *"Quais itens estão acabando?"*: confundiu o estoque (`produtos.estoque`) com a quantidade vendida (`itens_pedido.quantidade`).
+  - No teste, só 2 tipos de pergunta tiveram erro em todos os casos: `pedidos_por_mes` e `ticket_medio`, com 1 pergunta cada.
+
+  Esses casos mostram o que faltou no dataset: nomes de estados por extenso, variação de maiúsculas e minúsculas, perguntas sem o ano e outras formas de citar o status.
 
 ### Testes de parâmetros
 Os resultados completos estão na **Etapa 10** do notebook.
 
-**Geração (Etapa 10.1):** o modelo treinado foi avaliado no teste com 4 combinações:
+**Geração (Etapa 10.1):** modelo treinado avaliado no teste (75 perguntas):
 
-| temperature | top_p |
-|---|---|
-| 0.0 (determinístico) | 1.0 |
-| 0.3 | 0.9 |
-| 0.7 | 0.9 |
-| 1.0 | 0.95 |
-
-Com `temperature = 0` o modelo sempre escolhe o token mais provável, que é o comportamento esperado para gerar SQL. Valores maiores sorteiam tokens menos prováveis, o que aumenta a chance de gerar SQL inválido.
-
-**Treino (Etapa 10.2):** além do treino principal, treinamos o modelo base de novo com outras duas configurações e comparamos a acurácia final:
-
-| Configuração | Taxa de aprendizado | Épocas | Rank do LoRA |
+| temperature | top_p | Acurácia | SQL válido |
 |---|---|---|---|
-| Principal | 2e-4 | 3 | 16 |
-| `lr5e-5_r16_1ep` | 5e-5 | 1 | 16 |
-| `lr2e-4_r4_2ep` | 2e-4 | 2 | 4 |
+| 0.0 (determinístico) | 1.0 | **96,0%** | 98,7% |
+| 0.3 | 0.9 | 94,7% | 98,7% |
+| 0.7 | 0.9 | 96,0% | 98,7% |
+| 1.0 | 0.95 | 93,3% | 96,0% |
+
+Depois do fine-tuning, o modelo fica muito "confiante" no padrão aprendido, então a temperature mudou pouco o resultado. Mesmo assim, a melhor configuração foi `temperature = 0`, e a pior foi a mais aleatória (1.0), que também gerou mais SQL inválido. Para SQL, que precisa ser exato, o recomendado é usar `temperature = 0`.
+
+**Treino (Etapa 10.2):** treinamos o modelo base de novo com outras configurações e comparamos:
+
+| Configuração | Taxa de aprendizado | Épocas | Rank LoRA | Tempo | Teste | Teste manual |
+|---|---|---|---|---|---|---|
+| **Principal** | 2e-4 | 3 | 16 | 9,1 min | **96,0%** | **76,7%** |
+| `lr5e-5_r16_1ep` | 5e-5 | 1 | 16 | 3,0 min | 89,3% | 73,3% |
+| `lr2e-4_r4_2ep` | 2e-4 | 2 | 4 | 6,0 min | 92,0% | 66,7% |
+
+- **Taxa de aprendizado menor e menos épocas** (5e-5, 1 época): treina em 1/3 do tempo, mas o modelo aprende menos e perde cerca de 7 pontos no teste.
+- **Rank do LoRA menor** (r = 4, só 0,42% dos parâmetros treináveis): foi a configuração que mais perdeu no teste manual (66,7%). Com menos parâmetros, o modelo generaliza pior para perguntas diferentes.
+- **A configuração principal foi a melhor nos dois testes.** Todos os treinos usaram cerca de 6 GB de VRAM, bem abaixo dos 15 GB da T4.
 
 ### Limitações e próximos passos
 - O banco e as perguntas são de um único domínio (loja online), e o treino usa 26 tipos de pergunta.
